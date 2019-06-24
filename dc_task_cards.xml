@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<unload unload_date="2018-07-24 23:31:39">
+<sp_widget action="INSERT_OR_UPDATE">
+<category>custom</category>
+<client_script><![CDATA[function($scope,$http,spUtil,spModal) {
+	/* widget controller */
+	var c = this;
+	c.tasks = c.data.tasks;
+	c.filters = [
+		{text: "${All}", filter: "all"},
+		{text: "${Assigned to me}", filter:"me"},
+		{text: "${Unassigned}", filter:"empty"}
+	]
+	c.filter = c.filters[0].filter;
+	c.clickTask = function(task) {
+		c.selected = task.sys_id;
+	}
+	c.showMe = function(task) {
+		if (c.filter == "empty")
+			return !task.assigned_to.value;
+		if (c.filter == "me")
+			return task.assigned_to.value == c.data.user;
+		return true;
+	}
+	c.getAssignedTo = function(task) {
+		var assignedTo = task.assigned_to.value;
+		if (assignedTo == c.data.user)
+			return "${you}"
+			if (!assignedTo)
+				return "${nobody}";
+		return task.assigned_to.display_value;
+	}
+	c.setFilter = function(filter) {
+		filter.selected = true;
+	}
+	c.openTask = function(sys_id) {
+		spModal.open({
+			size: 'lg',
+			widget: "widget-form",
+			widgetInput: {
+				sys_id: sys_id,
+				table: c.data.table
+			}
+		})
+	}
+	c.assignToMe = function(user) {
+		if (!c.selected)
+			return;
+		var task = _.find(c.tasks, function(input) {
+			return c.selected == input.sys_id;
+		});
+		task.loading = true;
+		$http.patch("api/now/table/" + c.data.table + "/" + c.selected, {
+			"assigned_to": user
+		}).then(function(r) {
+			task.loading = false;
+		});
+	}
+	spUtil.recordWatch(
+		$scope,
+		c.data.table,
+		c.data.query, 
+		function(change) {
+			/* Find and return the event in the c.data.events array whose sys_id matches the sys_id in the 'args' parameter */
+			var record = _.find(c.tasks, function(input) {
+				return change.data.sys_id == input.sys_id;
+			});
+			if (record) {
+				var changedRecord = change.data.record;
+				if (changedRecord.assigned_to) {
+					record.assigned_to.value = changedRecord.assigned_to.value;
+					record.assigned_to.value = changedRecord.assigned_to.value;
+					$scope.$digest();
+				}
+			}
+		});
+}]]></client_script>
+<controller_as>c</controller_as>
+<css>div.filter-box {
+  margin: 10px;
+  &gt; a {
+    padding-left: 5px;
+    &amp;:hover {
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    &amp;[disabled="disabled"] {
+      color: inherit;
+      text-decoration: initial;
+      &amp;:hover {
+        cursor: default
+      }
+    }
+  }
+}
+
+.cards{
+  .card {
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px 0 rgba(0,0,0,0.2);
+    margin-bottom: 20px;
+    margin-left: 10px;
+    margin-right: 10px;
+    transition: 0.3s;
+
+    &gt; a {
+      color: inherit;
+    }
+
+    &amp;:hover {
+      cursor: pointer;
+    }
+
+    &amp;.selected {
+      box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+      background-color: $brand-info;
+      color: white;
+    }
+
+    .card-container {
+      padding: 20px;
+      .secondary {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+    }
+    button {
+      margin-top: 10px;
+    }
+  }
+}</css>
+<data_table>sp_instance</data_table>
+<demo_data/>
+<description/>
+<docs display_value=""/>
+<field_list/>
+<has_preview>true</has_preview>
+<id>dc_task_cards</id>
+<internal>false</internal>
+<link><![CDATA[function(scope, element) {
+	// we can't inject services into the link function, but we can get them another way...
+	var $window = $injector.get('$window');
+	// we have access to the scope object, which has our client controller on it
+	var controller = scope.c;
+	registerWindowEvents();
+
+	function registerWindowEvents() {
+		// register our window listener
+		angular.element($window).on('keyup', function(event) {
+			if (event.keyCode == 65) { // 'a' key
+				controller.assignToMe(controller.data.user);	//pressing u will assign me
+				return;
+			}
+			if (event.keyCode == 85) { // 'u' key
+				controller.assignToMe("");	//pressing u will unassign me
+				return;
+			}
+			if (event.keyCode == 13) { // 'enter' key
+				if (controller.selected) //pressing enter will open the task modal
+					controller.openTask(controller.selected);
+				return;
+			}
+			//if button pressed is up or down, we will record it, otherwise, exit
+			var direction = event.keyCode == 40 ? 'down' : (event.keyCode == 38 ? 'up' : false);
+			if (!direction) //if up or down wasn't pressed, get out of here
+				return;
+			
+			// using element.find ensures we are only searching within our widget
+			var selected = element.find('.selected');
+			// find the element below the selected one, and click it
+			var next;
+			if (!selected.length) //if there are none, we use the first card element and select that
+				next = element.find('.card');
+			else //if direction pressed is up, then grab the previous element. otherwise, grab next
+				next = direction == 'up' ? selected.prev() : selected.next();
+			if (!next.length)
+				return; //if we are at end/beginning ignore
+			// if we got here we have a "next" element
+			controller.selected = next[0].id;
+			//next[0].scrollIntoView(); //optional code to scroll the next card into view
+			scope.$digest(); //process updates to scope
+		});
+	}
+}]]></link>
+<name>DC Task Cards</name>
+<option_schema/>
+<public>false</public>
+<roles/>
+<script><![CDATA[(function() {
+	//setup our constants
+	data.table = options.table || 'incident';
+	data.query = options.query || 'active=true';
+	data.per_page = options.per_page || 20;
+	data.order_by = options.order_by || 'sys_updated_on';
+	data.display = options.display_field || 'number';
+	data.secondary_1 = options.secondary_1 || 'short_description';
+	data.secondary_2 = options.secondary_2 || 'sys_updated_on';
+	data.user = gs.getUserID();
+	
+	//on first run
+	if (!input) {
+		data.tasks = [];
+		getTasks(data.tasks, 0);
+	}
+
+	//input.get functions
+	if (input) {
+		console.log(input);
+		return {
+			test: 'test'
+		}
+	}
+
+	function getTasks(tasks, page) {
+		var task = new GlideRecordSecure(data.table);
+		task.addEncodedQuery(data.query);
+		task.orderByDesc("sys_updated_on");
+		var from = (page - 1) * data.per_page;
+		var to = page * data.per_page;
+		//task.chooseWindow(from, to, true);
+		data.total_records = task.getRowCount();
+		task.query();
+		while (task.next()) {
+			tasks.push({
+				display: $sp.getField(task, data.display),
+				secondary: $sp.getField(task, data.secondary_1),
+				tertiary: $sp.getField(task, data.secondary_2),
+				sys_id: task.getUniqueValue(),
+				assigned_to: $sp.getField(task, "assigned_to")
+			});
+		}
+	}
+})();]]></script>
+<servicenow>false</servicenow>
+<sys_class_name>sp_widget</sys_class_name>
+<sys_created_by>daniel.conroy@servicenow.com</sys_created_by>
+<sys_created_on>2018-07-24 02:04:00</sys_created_on>
+<sys_id>18f90768db23d300ea5e70bdbf9619bb</sys_id>
+<sys_mod_count>165</sys_mod_count>
+<sys_name>DC Task Cards</sys_name>
+<sys_package display_value="Global" source="global">global</sys_package>
+<sys_policy/>
+<sys_scope display_value="Global">global</sys_scope>
+<sys_update_name>sp_widget_18f90768db23d300ea5e70bdbf9619bb</sys_update_name>
+<sys_updated_by>daniel.conroy@servicenow.com</sys_updated_by>
+<sys_updated_on>2018-07-24 23:27:19</sys_updated_on>
+<template><![CDATA[<div>
+  <div class="filter-box">
+    ${Show}:
+    <a ng-click="c.filter = filter.filter"
+       ng-repeat="filter in c.filters"
+       ng-disabled="c.filter == filter.filter"
+       >{{filter.text}}</a>
+  </div>
+  <div class="cards">
+    <div class="card"
+         id="{{task.sys_id}}"
+         ng-repeat="task in c.tasks track by task.sys_id"
+         ng-class="{ 'selected' : c.selected == task.sys_id }"
+         ng-click="c.clickTask(task)"
+         ng-if="c.showMe(task)"
+         >
+      <div class="card-container">
+        <div class="tertiary pull-right">
+          {{task.tertiary.display_value}}
+        </div>
+        <div class="display">
+          <i class="fa fa-circle"
+             ng-class="{'text-success':task.assigned_to.value==c.data.user,'text-primary':!task.assigned_to.value}"></i>
+          {{task.display.display_value}}
+        </div>
+        <div class="secondary">
+          {{task.secondary.display_value}}
+        </div>
+        <div ng-show="c.selected == task.sys_id && !task.loading">
+          ${Task is assigned to}:&nbsp;
+          {{c.getAssignedTo(task)}}.
+          <span ng-show="task.assigned_to.value != c.data.user">
+            ${Press 'a' to assign to yourself}.
+          </span>
+          <span ng-show="task.assigned_to.value == c.data.user">
+            ${Press 'u' to unassign yourself}.
+          </span>
+        </div>
+        <div ng-show="c.selected == task.sys_id && task.loading">
+          <i class="fa fa-spin fa-refresh"></i>&nbsp;${Reassigning...}
+        </div>
+        <div ng-show="c.selected == task.sys_id">
+          <button class="btn btn-primary" ng-click="c.openTask(task.sys_id)">
+            ${Open}&nbsp;{{::c.data.table}}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>]]></template>
+</sp_widget>
+</unload>
