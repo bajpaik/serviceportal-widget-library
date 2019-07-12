@@ -38,3 +38,61 @@
     </div>
   </div>
 </div>
+
+
+//Client Script
+
+function($scope) {
+  /* widget controller */
+  var c = this;
+	
+	$scope.personalDetails = [];
+	/*$scope.personalDetails = [
+        {
+            'fname':'',
+            'lname':'',
+            'email':''
+        }];*/
+    
+        $scope.addNew = function(personalDetail){
+            $scope.personalDetails.push({ 
+                'fname': "", 
+                'lname': "",
+                'email': ""
+            });
+						console.log(JSON.stringify($scope.personalDetails));
+        };
+    
+		console.log(JSON.stringify($scope.personalDetails));
+	
+        $scope.remove = function(){
+            var newDataList=[];
+            $scope.selectedAll = false;
+            angular.forEach($scope.personalDetails, function(selected){
+                if(!selected.selected){
+                    newDataList.push(selected);
+                }
+            }); 
+            $scope.personalDetails = newDataList;
+        };
+    
+    $scope.checkAll = function () {
+        if (!$scope.selectedAll) {
+            $scope.selectedAll = true;
+        } else {
+            $scope.selectedAll = false;
+        }
+        angular.forEach($scope.personalDetails, function(personalDetail) {
+            personalDetail.selected = $scope.selectedAll;
+        });
+    };    
+	
+}
+
+//CSS
+.btn-primary{
+    margin-right: 10px;
+}
+.container{
+  margin: 20px 0;
+}
